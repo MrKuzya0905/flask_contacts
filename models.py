@@ -32,8 +32,8 @@ class User(db.Model, UserMixin):
 
     id: Mapped[str] = mapped_column(String(100), primary_key=True)
     username: Mapped[str] = mapped_column(String(20), unique=True)
-    password_: Mapped[str] = mapped_column(String(128))
-    fullname: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default=None)
+    password_: Mapped[str] = mapped_column(String(500))
+    full_name: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default=None)
     phone_number: Mapped[Optional[str]] = mapped_column(String(15), nullable=True, default=None)
     is_active: Mapped[bool] = mapped_column(Boolean(), default=True)
     contacts: Mapped[List[Contact]] = relationship()

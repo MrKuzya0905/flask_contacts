@@ -4,10 +4,16 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, current_user, login_user, logout_user, login_required
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.utils import secure_filename
+from flask_caching import Cache
 
 from models import db, User, Contact
 from config import settings
 from forms import SignUpForm, SignInForm, ContactForm
+
+config = {
+    "CACHE_TYPE": "SimpleCache",  # Flask-Caching related configs
+    "CACHE_DEFAULT_TIMEOUT": 300
+}
 
 app = Flask(__name__)
 app.secret_key = settings.secret_key
@@ -17,6 +23,8 @@ app.config['MAX_FORM_MEMORY_SIZE'] = 1024 * 1024  # 1MB
 app.config['MAX_FORM_PARTS'] = 500
 db.init_app(app)
 csrf_protect = CSRFProtect(app)
+app.config.from_mapping(config)
+cache = Cache(app)
 
 login_manager = LoginManager()
 login_manager.login_message = "Please log in to access this page."
@@ -28,8 +36,10 @@ login_manager.init_app(app)
 #     db.drop_all()
 #     db.create_all()
 
+
 @login_manager.user_loader
 def load_user(user_id):
+    print("Пішов запит до БД за користувачем")
     return User.query.filter_by(id=user_id).first_or_404()
 
 @app.route('/signUp/', methods=['GET', 'POST'])
@@ -65,7 +75,9 @@ def sign_in():
 
 @app.get('/')
 @login_required
+@cache.cached(timeout=30, query_string=True)
 def cabinet():
+    print("Пішов запит до БД за контактами")
     return render_template('cabinet.html')
 
 @app.get('/logout/')
@@ -99,6 +111,7 @@ def add_contact():
         
         db.session.add(contact)
         db.session.commit()
+        cache.clear()
         return redirect(url_for('cabinet'))
     
     return render_template('add_contact.html', form=form)

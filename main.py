@@ -1,4 +1,5 @@
 from uuid import uuid4
+import pickle
 
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import LoginManager, current_user, login_user, logout_user, login_required
@@ -12,7 +13,7 @@ from forms import SignUpForm, SignInForm, ContactForm
 
 config = {
     "CACHE_TYPE": "SimpleCache",  # Flask-Caching related configs
-    "CACHE_DEFAULT_TIMEOUT": 300
+    "CACHE_DEFAULT_TIMEOUT": 30
 }
 
 app = Flask(__name__)
@@ -32,15 +33,22 @@ login_manager.login_view = 'sign_in'
 login_manager.init_app(app)
 
 
-# with app.app_context():
-#     db.drop_all()
-#     db.create_all()
+with app.app_context():
+    db.drop_all()
+    db.create_all()
 
 
 @login_manager.user_loader
 def load_user(user_id):
-    print("Пішов запит до БД за користувачем")
-    return User.query.filter_by(id=user_id).first_or_404()
+    user = cache.get(user_id)
+    if user:
+        user = pickle.loads(user)
+        print("Пішов запит до кешу за користувачем")
+    else:
+        user = User.query.filter_by(id=user_id).first_or_404()
+        cache.set(user_id, pickle.dumps(user))
+        print("Пішов запит до БД за користувачем")
+    return user
 
 @app.route('/signUp/', methods=['GET', 'POST'])
 def sign_up():
@@ -75,10 +83,16 @@ def sign_in():
 
 @app.get('/')
 @login_required
-@cache.cached(timeout=30, query_string=True)
 def cabinet():
-    print("Пішов запит до БД за контактами")
-    return render_template('cabinet.html')
+    contacts = cache.get(f'contacts_{current_user.id}')
+    if contacts:
+        contacts = pickle.loads(contacts)
+        print("Пішов запит до кешу за контактами")
+    else:
+        contacts = current_user.contacts
+        cache.set(f'contacts_{current_user.id}', pickle.dumps(contacts))
+        print("Пішов запит до БД за контактами")
+    return render_template('cabinet.html', contacts=contacts)
 
 @app.get('/logout/')
 @login_required
